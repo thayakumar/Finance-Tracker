@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Google AI Studio App</title>
+    <script id="fetch-sandbox-safe-patch">
+      (function() {
+        var _fetch = window.fetch;
+        try {
+          Object.defineProperty(window, 'fetch', {
+            get: function() {
+              return _fetch;
+            },
+            set: function(val) {
+              _fetch = val;
+            },
+            configurable: true,
+            enumerable: true
+          });
+        } catch (e1) {
+          try {
+            var _selfFetch = self.fetch;
+            Object.defineProperty(self, 'fetch', {
+              get: function() { return _selfFetch || window.fetch; },
+              set: function(val) { _selfFetch = val; },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e2) {}
+          try {
+            var _globalThisFetch = globalThis.fetch;
+            Object.defineProperty(globalThis, 'fetch', {
+              get: function() { return _globalThisFetch || window.fetch; },
+              set: function(val) { _globalThisFetch = val; },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e3) {}
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
