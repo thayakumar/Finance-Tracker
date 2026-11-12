@@ -1,0 +1,84 @@
+// Google Apps Script - LedgerStream Universal Connector
+// Automates direct, login-free read/write access to Google Sheet & Drive
+
+const SPREADSHEET_ID = "17CyWN68zCkijc1drXUbIFbHXs76I5ayEexWB6GpdKak";
+const FOLDER_ID = "1_fo4Fn8Oq-ttn1vhZAAZFUH49jIyJrXd";
+
+function doGet(e) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName("DATA");
+    if (!sheet) {
+      sheet = ss.insertSheet("DATA");
+      sheet.appendRow(["Date", "Item", "Amount", "Category", "Receipt Link", "Receipt Name"]);
+    }
+    
+    const data = sheet.getDataRange().getValues();
+    const rows = [];
+    
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0] && !row[1] && !row[2]) continue; // Skip blank rows
+      rows.push({
+        id: "row-" + (i + 1),
+        date: row[0] instanceof Date ? Utilities.formatDate(row[0], Session.getScriptTimeZone(), "yyyy-MM-dd") : row[0].toString(),
+        item: row[1] || "",
+        amount: parseFloat(row[2]) || 0,
+        category: row[3] || "Unknown",
+        receiptUrl: row[4] || "",
+        receiptName: row[5] || ""
+      });
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({ success: true, values: rows }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const postData = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName("DATA");
+    if (!sheet) {
+      sheet = ss.insertSheet("DATA");
+      sheet.appendRow(["Date", "Item", "Amount", "Category", "Receipt Link", "Receipt Name"]);
+    }
+
+    let receiptUrl = postData.receiptUrl || "";
+    let receiptName = postData.receiptName || "";
+
+    // If an uploaded base64 file is included, decode and save to custom receipts folder
+    if (postData.fileBase64 && postData.fileName) {
+      const folder = DriveApp.getFolderById(FOLDER_ID);
+      const decodedBytes = Utilities.base64Decode(postData.fileBase64);
+      const mimeType = postData.fileMimeType || "application/octet-stream";
+      const blob = Utilities.newBlob(decodedBytes, mimeType, postData.fileName);
+      const file = folder.createFile(blob);
+      
+      // Grant viewability so receipts can be click-opened from the Sheet row
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      
+      receiptUrl = file.getUrl();
+      receiptName = file.getName();
+    }
+
+    sheet.appendRow([
+      postData.date,
+      postData.item,
+      postData.amount.toString(),
+      postData.category,
+      receiptUrl,
+      receiptName
+    ]);
+
+    return ContentService.createTextOutput(JSON.stringify({ success: true, receiptUrl, receiptName }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
